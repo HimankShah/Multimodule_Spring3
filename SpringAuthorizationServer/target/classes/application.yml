@@ -1,4 +1,3 @@
-
 server:
   port: 9000
 
@@ -7,6 +6,23 @@ logging:
     org:
       springframework:
         security: INFO
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/multimodule
+    username: root
+    password: 1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+
+spring.jpa:
+  defer-datasource-initialization: true
+  hibernate.ddl-auto: update
+  generate-ddl: false
+  show-sql: true
+  properties: 
+    hibernate:
+      format_sql: true
 
 #spring:
 #  security:
