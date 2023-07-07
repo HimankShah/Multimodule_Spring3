@@ -1,13 +1,17 @@
 package willydekeyser.config;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
-import org.apache.tomcat.util.http.parser.Authorization;
 import org.springframework.dao.DataRetrievalFailureException;
 import org.springframework.security.jackson2.SecurityJackson2Modules;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
+import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
@@ -19,15 +23,17 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mysql.cj.util.StringUtils;
 
-import willydekeyser.repository.AuthorizationRepository;
 import willydekeyser.entity.Authorization;
+import willydekeyser.repository.AuthorizationRepository;
 
 @Service
-public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService{
+public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService {
 
 	private final AuthorizationRepository authorizationRepository;
 	private final RegisteredClientRepository registeredClientRepository;
@@ -40,18 +46,29 @@ public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService
 		this.registeredClientRepository = registeredClientRepository;
 
 		ClassLoader classLoader = JpaOAuth2AuthorizationService.class.getClassLoader();
-		List<com.fasterxml.jackson.databind.Module> securityModules = SecurityJackson2Modules.getModules(classLoader);
+		List<Module> securityModules = SecurityJackson2Modules.getModules(classLoader);
 		this.objectMapper.registerModules(securityModules);
 		this.objectMapper.registerModule(new OAuth2AuthorizationServerJackson2Module());
 	}
-	
+
 	@Override
 	public void save(OAuth2Authorization authorization) {
 		Assert.notNull(authorization, "authorization cannot be null");
 		this.authorizationRepository.save(toEntity(authorization));
 	}
 
-	
+	@Override
+	public void remove(OAuth2Authorization authorization) {
+		Assert.notNull(authorization, "authorization cannot be null");
+		this.authorizationRepository.deleteById(authorization.getId());
+	}
+
+	@Override
+	public OAuth2Authorization findById(String id) {
+		Assert.hasText(id, "id cannot be empty");
+		return this.authorizationRepository.findById(id).map(this::toObject).orElse(null);
+	}
+
 	@Override
 	public OAuth2Authorization findByToken(String token, OAuth2TokenType tokenType) {
 		Assert.hasText(token, "token cannot be empty");
@@ -128,7 +145,7 @@ public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService
 
 		return builder.build();
 	}
-	
+
 	private Authorization toEntity(OAuth2Authorization authorization) {
 		Authorization entity = new Authorization();
 		entity.setId(authorization.getId());
@@ -188,21 +205,46 @@ public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService
 		return entity;
 	}
 
-	@Override
-	public void remove(OAuth2Authorization authorization) {
-		// TODO Auto-generated method stub
-		
+	private void setTokenValues(
+			OAuth2Authorization.Token<?> token,
+			Consumer<String> tokenValueConsumer,
+			Consumer<Instant> issuedAtConsumer,
+			Consumer<Instant> expiresAtConsumer,
+			Consumer<String> metadataConsumer) {
+		if (token != null) {
+			OAuth2Token oAuth2Token = token.getToken();
+			tokenValueConsumer.accept(oAuth2Token.getTokenValue());
+			issuedAtConsumer.accept(oAuth2Token.getIssuedAt());
+			expiresAtConsumer.accept(oAuth2Token.getExpiresAt());
+			metadataConsumer.accept(writeMap(token.getMetadata()));
+		}
 	}
 
-	@Override
-	public OAuth2Authorization findById(String id) {
-		// TODO Auto-generated method stub
-		return null;
+	private Map<String, Object> parseMap(String data) {
+		try {
+			return this.objectMapper.readValue(data, new TypeReference<Map<String, Object>>() {
+			});
+		} catch (Exception ex) {
+			throw new IllegalArgumentException(ex.getMessage(), ex);
+		}
 	}
 
-	
-	
-	
-	
-	
+	private String writeMap(Map<String, Object> metadata) {
+		try {
+			return this.objectMapper.writeValueAsString(metadata);
+		} catch (Exception ex) {
+			throw new IllegalArgumentException(ex.getMessage(), ex);
+		}
+	}
+
+	private static AuthorizationGrantType resolveAuthorizationGrantType(String authorizationGrantType) {
+		if (AuthorizationGrantType.AUTHORIZATION_CODE.getValue().equals(authorizationGrantType)) {
+			return AuthorizationGrantType.AUTHORIZATION_CODE;
+		} else if (AuthorizationGrantType.CLIENT_CREDENTIALS.getValue().equals(authorizationGrantType)) {
+			return AuthorizationGrantType.CLIENT_CREDENTIALS;
+		} else if (AuthorizationGrantType.REFRESH_TOKEN.getValue().equals(authorizationGrantType)) {
+			return AuthorizationGrantType.REFRESH_TOKEN;
+		}
+		return new AuthorizationGrantType(authorizationGrantType);              // Custom authorization grant type
+	}
 }
