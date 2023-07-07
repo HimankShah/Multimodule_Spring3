@@ -2,13 +2,13 @@ package willydekeyser.repository;
 
 import java.util.Optional;
 
-import org.apache.tomcat.util.http.parser.Authorization;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import willydekeyser.entity.Authorization;
 
-public interface AuthorizationRepository extends JpaRepository<Authorization, String>{
+public interface AuthorizationRepository extends JpaRepository<Authorization, String> {
 
 	Optional<Authorization> findByState(String state);
 	Optional<Authorization> findByAuthorizationCodeValue(String authorizationCode);
@@ -20,5 +20,4 @@ public interface AuthorizationRepository extends JpaRepository<Authorization, St
 			" or a.refreshTokenValue = :token"
 	)
 	Optional<Authorization> findByStateOrAuthorizationCodeValueOrAccessTokenValueOrRefreshTokenValue(@Param("token") String token);
-	
 }
