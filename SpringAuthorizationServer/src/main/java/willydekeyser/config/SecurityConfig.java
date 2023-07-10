@@ -2,6 +2,7 @@ package willydekeyser.config;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
+import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
@@ -54,6 +56,8 @@ public class SecurityConfig {
 		        .scope(OidcScopes.PROFILE)
 		        .scope("user.read")
 		        .scope("user.write")
+		        .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(30L)).build())
+		        .tokenSettings(TokenSettings.builder().refreshTokenTimeToLive(Duration.ofDays(1L)).build())
 		        .clientSettings(ClientSettings.builder().requireAuthorizationConsent(false).requireProofKey(false).build())
 				.build();
 		
@@ -98,6 +102,7 @@ public class SecurityConfig {
 		return http.build();
 	}
 	
+	
 	@Bean
     WebSecurityCustomizer webSecurityCustomizer() {
         return (web) -> web.debug(false)
@@ -121,6 +126,7 @@ public class SecurityConfig {
 				Set<String> authorities = principal.getAuthorities().stream().map(GrantedAuthority::getAuthority)
 						.collect(Collectors.toSet());
 				context.getClaims().claim("authorities", authorities);
+				context.getClaims().claim("ConstValue", "ConstValue");	
 			}
 		};
 	}
